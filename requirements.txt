@@ -1,0 +1,12 @@
+numpy==1.11
+astropy==1.2
+scipy==0.17
+scikit-image==0.12
+couchdb==1.0
+
+#test
+tox==2.3
+
+#dev
+ipython
+ipdb
