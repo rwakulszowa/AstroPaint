@@ -1,5 +1,7 @@
 import uuid
 
+import astropaint.base
+
 
 class Classed(object):
     def __init__(self, layout, cluster, id=None):
@@ -22,7 +24,7 @@ class Classifier(object):
         self.raw = raw
 
     def execute(self):
-        layout = DumbLayoutPicker(self.db, self.analyzed).pick()
+        layout = LayoutPicker(self.db, self.analyzed).pick()
         cluster = 0  #STUB
         classed = Classed(layout, cluster)
         self._put_into_db(classed)
@@ -31,6 +33,9 @@ class Classifier(object):
     def _put_into_db(self, o):
         return self.db.put_classed(o)
 
+    def _classify(self, layout):
+        pass
+
 
 class Layout(object):
     def __init__(self, clusters, kind):
@@ -38,12 +43,10 @@ class Layout(object):
         self.kind = kind
 
 
-class BaseLayoutPicker(object):
+class LayoutPicker(astropaint.base.BasePicker):
     def __init__(self, db, analyzed):
         self.db = db
         self.analyzed = analyzed
 
-
-class DumbLayoutPicker(BaseLayoutPicker):
-    def pick(self):
+    def _pick_dumb(self):
         return Layout([{"TODO": "pleas"}], "ANY")

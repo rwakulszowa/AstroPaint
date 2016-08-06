@@ -5,6 +5,8 @@ import numpy as np
 import skimage.io
 import skimage.exposure
 
+import astropaint.base
+
 
 class Processed(object):
     def __init__(self, filter, image_path, evaluation, id=None):
@@ -31,7 +33,7 @@ class Processor(object):
         self.raw = raw
 
     def execute(self):
-        filter = DumbFilterPicker(self.db, self.classed).pick()
+        filter = FilterPicker(self.db, self.classed).pick()
         image_path = "./temp/{}.png".format(random.randint(0, 100))
         evaluation = [0]  #STUB
         data = self._process(filter)
@@ -56,11 +58,11 @@ class Processor(object):
 
     def _apply(self, data, step):
         return {
-            "stretch": self._stretch
+            "stretch": self._apply_stretch
         }.get(step['method'])(data, step['params'])
 
     @staticmethod
-    def _stretch(data, params):
+    def _apply_stretch(data, params):
         return np.dstack([
             skimage.exposure.rescale_intensity(d, in_range=tuple(np.percentile(d, params)))
             for d in [data[:,:,i] for i in range(data.shape[-1])]
@@ -73,12 +75,10 @@ class Filter(object):
         self.kind = kind
 
 
-class BaseFilterPicker(object):
+class FilterPicker(astropaint.base.BasePicker):
     def __init__(self, db, classed):
         self.db = db
         self.classed = classed
 
-
-class DumbFilterPicker(BaseFilterPicker):
-    def pick(self):
+    def _pick_dumb(self):
         return Filter([{"method": "stretch", "params": [2, 99.5]}], "ANY")
