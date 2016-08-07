@@ -9,7 +9,6 @@ class Raw(object):
     def __init__(self, urls, kind):
         self.urls = urls
         self.kind = kind
-        # self.data = [self._normalize(self._read(u)) for u in self.urls]
         self.data = np.dstack([self._normalize(self._read(u)) for u in self.urls])
 
     @staticmethod

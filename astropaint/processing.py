@@ -25,7 +25,11 @@ class Processed(object):
 
 
 class Processor(object):
-    METHODS = ["stretch"]
+    METHODS = [
+        {"method": "stretch", "params": [5, 95]},
+        {"method": "histeq", "params": []},
+        {"method": "adjust_gamma", "params": []}
+    ]
 
     def __init__(self, db, classed, raw):
         self.db = db
@@ -58,8 +62,24 @@ class Processor(object):
 
     def _apply(self, data, step):
         return {
-            "stretch": self._apply_stretch
-        }.get(step['method'])(data, step['params'])
+            "stretch": self._apply_stretch,
+            "histeq": self._apply_histeq,
+            "adjust_gamma": self._apply_adjust_gamma
+        }[step['method']](data, step['params'])
+
+    @staticmethod
+    def _apply_adjust_gamma(data, params):
+        return np.dstack([
+            skimage.exposure.adjust_gamma(d)
+            for d in [data[:,:,i] for i in range(data.shape[-1])]
+        ])
+
+    @staticmethod
+    def _apply_histeq(data, params):
+        return np.dstack([
+            skimage.exposure.equalize_hist(d)
+            for d in [data[:,:,i] for i in range(data.shape[-1])]
+        ])
 
     @staticmethod
     def _apply_stretch(data, params):
@@ -79,6 +99,13 @@ class FilterPicker(astropaint.base.BasePicker):
     def __init__(self, db, classed):
         self.db = db
         self.classed = classed
+
+    def _pick_creative(self):
+        kind = self.classed.layout.kind
+        methods = Processor.METHODS[:]
+        random.shuffle(methods)
+        steps = random.sample(methods, random.randint(1, len(methods)))
+        return Filter(steps, kind)
 
     def _pick_dumb(self):
         return Filter([{"method": "stretch", "params": [2, 99.5]}], "ANY")

@@ -1,4 +1,5 @@
 import uuid
+import random
 
 import numpy as np
 
@@ -13,14 +14,19 @@ class Analyzed(object):
 
     def dictify(self):
         return {
-            "model": self.model.__dict__,
+            "model": self.model.dictify(),
             "params": self.params,
             "id": self.id
         }
 
+    @classmethod
+    def undictify(cls, data):
+        data["model"] = Model.undictify(data["model"])
+        return Analyzed(**data)
+
 
 class Analyzer(object):
-    PARAMS = ["mean", "quantiles"]
+    PARAMS = {"mean", "percentile_5", "percentile_95"}
 
     def __init__(self, db, raw):
         self.db = db
@@ -37,19 +43,23 @@ class Analyzer(object):
         return self.db.put_analyzed(o)
 
     def _analyze(self, model):
-        return {param: self._compute(param) for param in model.params}
+        return [self._compute(param) for param in model.params]
 
     def _compute(self, param):
         return {
             "mean": self._compute_mean,
-            "quantiles": self._compute_quantiles
-        }.get(param)()
+            "percentile_5": self._compute_percentile_5,
+            "percentile_95": self._compute_percentile_95
+        }[param]()
 
     def _compute_mean(self):
         return self.raw.data.mean()
 
-    def _compute_quantiles(self):
-        return list(np.percentile(self.raw.data, range(20, 100, 20)))
+    def _compute_percentile_5(self):
+        return np.percentile(self.raw.data, 5)
+
+    def _compute_percentile_95(self):
+        return np.percentile(self.raw.data, 95)
 
 
 class Model(object):
@@ -57,11 +67,25 @@ class Model(object):
         self.params = params
         self.kind = kind
 
+    def dictify(self):
+        return self.__dict__
+
+    @classmethod
+    def undictify(cls, data):
+        return Model(**data)
+
 
 class ModelPicker(astropaint.base.BasePicker):
     def __init__(self, db, raw):
         self.db = db
         self.raw = raw
 
+    def _pick_creative(self):
+        #FIXME: params should be picked base on type (i.e. a galaxy will have different available params than a nebula)
+        kind = self.raw.kind
+        params = sorted(random.sample(Analyzer.PARAMS,
+                                      random.randint(1, len(Analyzer.PARAMS))))
+        return Model(params, kind)
+
     def _pick_dumb(self):
-        return Model(["mean", "quantiles"], "ANY")
+        return Model(["mean", "percentile_95"], "ANY")
