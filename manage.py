@@ -15,7 +15,7 @@ def cleardb():
     server = couchdb.client.Server(config.DB_ADDRESS)
     for db in DBS:
         db = server[db]
-        docs = [db[id] for id in db]
+        docs = [db[id] for id in db if not id.startswith('_')]
         db.purge(docs)
 
 
