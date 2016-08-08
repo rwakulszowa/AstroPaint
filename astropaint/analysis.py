@@ -6,23 +6,26 @@ import numpy as np
 import astropaint.base
 
 
-class Analyzed(object):
+class Analyzed(astropaint.base.BaseObject):
     def __init__(self, model, params, id=None):
         self.model = model
         self.params = params
         self.id = id or uuid.uuid4().hex
 
-    def dictify(self):
-        return {
-            "model": self.model.dictify(),
-            "params": self.params,
-            "id": self.id
-        }
-
     @classmethod
     def undictify(cls, data):
         data["model"] = Model.undictify(data["model"])
         return Analyzed(**data)
+
+
+class Model(astropaint.base.BaseObject):
+    def __init__(self, params, kind):
+        self.params = params
+        self.kind = kind
+
+    @classmethod
+    def undictify(cls, data):
+        return Model(**data)
 
 
 class Analyzer(object):
@@ -60,19 +63,6 @@ class Analyzer(object):
 
     def _compute_percentile_95(self):
         return np.percentile(self.raw.data, 95)
-
-
-class Model(object):
-    def __init__(self, params, kind):
-        self.params = params
-        self.kind = kind
-
-    def dictify(self):
-        return self.__dict__
-
-    @classmethod
-    def undictify(cls, data):
-        return Model(**data)
 
 
 class ModelPicker(astropaint.base.BasePicker):

@@ -8,20 +8,18 @@ import skimage.exposure
 import astropaint.base
 
 
-class Processed(object):
+class Processed(astropaint.base.BaseObject):
     def __init__(self, filter, image_path, evaluation, id=None):
         self.filter = filter
         self.image_path = image_path
         self.evaluation = evaluation
         self.id = id or uuid.uuid4().hex
 
-    def dictify(self):
-        return {
-            "filter": self.filter.__dict__,
-            "image_path": self.image_path,
-            "evaluation": self.evaluation,
-            "id": self.id
-        }
+
+class Filter(astropaint.base.BaseObject):
+    def __init__(self, steps, kind):
+        self.steps = steps
+        self.kind = kind
 
 
 class Processor(object):
@@ -89,10 +87,6 @@ class Processor(object):
         ])
 
 
-class Filter(object):
-    def __init__(self, steps, kind):
-        self.steps = steps
-        self.kind = kind
 
 
 class FilterPicker(astropaint.base.BasePicker):

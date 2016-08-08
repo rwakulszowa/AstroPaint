@@ -5,18 +5,18 @@ import sklearn.cluster
 import astropaint.base
 
 
-class Classed(object):
+class Classed(astropaint.base.BaseObject):
     def __init__(self, layout, cluster, id=None):
         self.layout = layout
         self.cluster = cluster
         self.id = id or uuid.uuid4().hex
 
-    def dictify(self):
-        return {
-            "layout": self.layout.__dict__,
-            "cluster": self.cluster,
-            "id": self.id
-        }
+
+class Layout(astropaint.base.BaseObject):
+    def __init__(self, clusters, features, kind):
+        self.clusters = clusters
+        self.features = features
+        self.kind = kind
 
 
 class Classifier(object):
@@ -37,13 +37,6 @@ class Classifier(object):
 
     def _classify(self, layout):
         pass
-
-
-class Layout(object):
-    def __init__(self, clusters, features, kind):
-        self.clusters = clusters
-        self.features = features
-        self.kind = kind
 
 
 class LayoutPicker(astropaint.base.BasePicker):
