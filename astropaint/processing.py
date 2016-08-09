@@ -22,12 +22,33 @@ class Filter(astropaint.base.BaseObject):
         self.kind = kind
 
 
+class ProcessorMethod(object):
+    def __init__(self, name, params):
+        self.name = name
+        self.params = params
+
+    def sample(self):
+        ans =  {
+            "method": self.name,
+            "params": [self._sample_param(p) for p in self.params]
+        }
+        return ans
+
+    @staticmethod
+    def _sample_param(param):
+        domain = "fixed" if type(param) is set else "cont"
+        if domain is "fixed":
+            return random.sample(param, k=1)
+        elif domain is "cont":
+            return random.uniform(param[0], param[1])
+
+
 class Processor(object):
-    METHODS = [
-        {"method": "stretch", "params": [5, 95]},
-        {"method": "histeq", "params": []},
-        {"method": "adjust_gamma", "params": []}
-    ]
+    METHODS = [ProcessorMethod(name, params) for name, params in [
+        ("stretch", [(0, 10), (90, 100)]),
+        ("histeq", []),
+        ("adjust_gamma", [])
+    ]]
 
     def __init__(self, db, classed, raw):
         self.db = db
@@ -87,8 +108,6 @@ class Processor(object):
         ])
 
 
-
-
 class FilterPicker(astropaint.base.BasePicker):
     def __init__(self, db, classed):
         self.db = db
@@ -99,6 +118,7 @@ class FilterPicker(astropaint.base.BasePicker):
         methods = Processor.METHODS[:]
         random.shuffle(methods)
         steps = random.sample(methods, random.randint(1, len(methods)))
+        steps = [s.sample() for s in steps]
         return Filter(steps, kind)
 
     def _pick_dumb(self):
