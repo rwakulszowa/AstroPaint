@@ -3,6 +3,7 @@ astropy==1.2
 scipy==0.17
 scikit-image==0.12
 couchdb==1.0
+requests==2.11
 
 #test
 tox==2.3
