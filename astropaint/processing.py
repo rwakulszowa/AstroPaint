@@ -4,6 +4,8 @@ import uuid
 import numpy as np
 import skimage.io
 import skimage.exposure
+import skimage.filters
+import skimage.morphology
 
 import astropaint.base
 
@@ -45,9 +47,11 @@ class ProcessorMethod(object):
 
 class Processor(object):
     METHODS = [ProcessorMethod(name, params) for name, params in [
-        ("stretch", [(0, 10), (90, 100)]),
-        ("histeq", []),
-        ("adjust_gamma", [])
+        ("stretch", [(0, 5), (98, 100)]),
+        ("adjust_gamma", [(0, 2)]),
+        ("adjust_log", []),
+        ("adjust_sigmoid", [(0, 1)]),
+        ("median", [])
     ]]
 
     def __init__(self, db, classed, raw):
@@ -82,21 +86,30 @@ class Processor(object):
     def _apply(self, data, step):
         return {
             "stretch": self._apply_stretch,
-            "histeq": self._apply_histeq,
-            "adjust_gamma": self._apply_adjust_gamma
+            "adjust_gamma": self._apply_adjust_gamma,
+            "adjust_log": self._apply_adjust_log,
+            "adjust_sigmoid": self._apply_adjust_sigmoid,
+            "median": self._apply_median,
         }[step['method']](data, step['params'])
 
     @staticmethod
     def _apply_adjust_gamma(data, params):
         return np.dstack([
-            skimage.exposure.adjust_gamma(d)
+            skimage.exposure.adjust_gamma(d, gamma=params[0])
             for d in [data[:,:,i] for i in range(data.shape[-1])]
         ])
 
     @staticmethod
-    def _apply_histeq(data, params):
+    def _apply_adjust_log(data, params):
         return np.dstack([
-            skimage.exposure.equalize_hist(d)
+            skimage.exposure.adjust_log(d)
+            for d in [data[:,:,i] for i in range(data.shape[-1])]
+        ])
+
+    @staticmethod
+    def _apply_adjust_sigmoid(data, params):
+        return np.dstack([
+            skimage.exposure.adjust_sigmoid(d, cutoff=params[0])
             for d in [data[:,:,i] for i in range(data.shape[-1])]
         ])
 
@@ -104,6 +117,13 @@ class Processor(object):
     def _apply_stretch(data, params):
         return np.dstack([
             skimage.exposure.rescale_intensity(d, in_range=tuple(np.percentile(d, params)))
+            for d in [data[:,:,i] for i in range(data.shape[-1])]
+        ])
+
+    @staticmethod
+    def _apply_median(data, params):
+        return np.dstack([
+            skimage.filters.median(d, selem=skimage.morphology.disk(3))
             for d in [data[:,:,i] for i in range(data.shape[-1])]
         ])
 
