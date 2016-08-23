@@ -13,11 +13,23 @@ class BasePicker(object):
     def pick(self):
         state = self._get_state()
         return {
-            "stub": self._pick_creative
+            "unknown": self._pick_hardcoded,
+            "dumb": self._pick_random,
+            "learning": self._pick_creative,
+            "smart": self._pick_best
         }[state]()
 
     def _get_state(self):
-        return "stub"
+        return "unknown"  #TODO
 
-    def _pick_dumb(self):
+    def _pick_hardcoded(self):
+        raise NotImplementedError
+
+    def _pick_random(self):
+        raise NotImplementedError
+
+    def _pick_creative(self):
+        raise NotImplementedError
+
+    def _pick_best(self):
         raise NotImplementedError

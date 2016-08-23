@@ -17,11 +17,20 @@ class Processed(astropaint.base.BaseObject):
         self.evaluation = evaluation
         self.id = id or uuid.uuid4().hex
 
+    @classmethod
+    def undictify(cls, data):
+        data["filter"] = Filter.undictify(data["filter"])
+        return Processed(**data)
+
 
 class Filter(astropaint.base.BaseObject):
     def __init__(self, steps, kind):
         self.steps = steps
         self.kind = kind
+
+    @classmethod
+    def undictify(cls, data):
+        return Filter(**data)
 
 
 class ProcessorMethod(object):
@@ -62,7 +71,7 @@ class Processor(object):
     def execute(self):
         filter = FilterPicker(self.db, self.classed).pick()
         image_path = "./temp/{}.png".format(random.randint(0, 100))
-        evaluation = [0]  #STUB
+        evaluation = []
         data = self._process(filter)
         self._save(data, image_path)
         processed = Processed(filter, image_path, evaluation)
@@ -133,7 +142,10 @@ class FilterPicker(astropaint.base.BasePicker):
         self.db = db
         self.classed = classed
 
-    def _pick_creative(self):
+    def _get_state(self):
+        return "dumb"
+
+    def _pick_random(self):
         kind = self.classed.layout.kind
         methods = Processor.METHODS[:]
         random.shuffle(methods)
@@ -141,5 +153,12 @@ class FilterPicker(astropaint.base.BasePicker):
         steps = [s.sample() for s in steps]
         return Filter(steps, kind)
 
-    def _pick_dumb(self):
+    def _pick_hardcoded(self):
         return Filter([{"method": "stretch", "params": [2, 99.5]}], "ANY")
+
+    def _pick_best(self):
+        kind = self.classed.layout.kind
+        processed = self.db.get_processed_by_kind(kind=kind)
+        best_filter = processed[0].filter
+        return best_filter
+

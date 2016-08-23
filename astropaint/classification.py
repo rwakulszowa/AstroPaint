@@ -11,12 +11,21 @@ class Classed(astropaint.base.BaseObject):
         self.cluster = cluster
         self.id = id or uuid.uuid4().hex
 
+    @classmethod
+    def undictify(cls, data):
+        data["layout"] = Layout.undictify(data["layout"])
+        return Classed(**data)
+
 
 class Layout(astropaint.base.BaseObject):
     def __init__(self, clusters, features, kind):
         self.clusters = clusters
         self.features = features
         self.kind = kind
+
+    @classmethod
+    def undictify(cls, data):
+        return Layout(**data)
 
 
 class Classifier(object):
@@ -45,6 +54,9 @@ class LayoutPicker(astropaint.base.BasePicker):
         self.analyzed = analyzed
         self.max_cluster_count = 3
 
+    def _get_state(self):
+        return "learning"
+
     def _pick_creative(self):
         model = self.analyzed.model
         analyzed_before = self.db.get_analyzed_by_model(model=model)
@@ -54,5 +66,5 @@ class LayoutPicker(astropaint.base.BasePicker):
         fitter.fit(data)
         return Layout(fitter.cluster_centers_.tolist(), model.params, model.kind)
 
-    def _pick_dumb(self):
+    def _pick_hardcoded(self):
         return Layout([[0.25], [0.75]], ["mean"], "ANY")
