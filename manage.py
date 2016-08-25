@@ -12,18 +12,17 @@ parser.add_argument(dest="command", help="One of: cleardb, evaluate")
 
 
 DBS = ["analysis", "classification", "processing"]
-
+SERVER = couchdb.client.Server(config.DB_ADDRESS)
 
 def cleardb():
     print("Clearing databases {} in {}".format(DBS, config.DB_ADDRESS))
-    server = couchdb.client.Server(config.DB_ADDRESS)
     for db in DBS:
-        db = server[db]
+        db = SERVER[db]
         docs = [db[id] for id in db if not id.startswith('_')]
         db.purge(docs)
 
 def evaluate():
-    db = couchdb.client.Server(config.DB_ADDRESS)["processing"]
+    db = SERVER["processing"]
     images = [p.split('.')[0] for p in os.listdir(config.STORAGE_DIR)
               if any(p.endswith(e) for e in [".jpg", ".jpeg", ".png", ".bmp"])]
     for id in images:

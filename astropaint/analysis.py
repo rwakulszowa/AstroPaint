@@ -70,6 +70,9 @@ class ModelPicker(astropaint.base.BasePicker):
         self.db = db
         self.raw = raw
 
+    def _pick_hardcoded(self):
+        return Model(["mean", "percentile_95"], "ANY")
+
     def _pick_random(self):
         #FIXME: params should be picked base on type (i.e. a galaxy will have different available params than a nebula)
         kind = self.raw.kind
@@ -77,5 +80,4 @@ class ModelPicker(astropaint.base.BasePicker):
                                       random.randint(1, len(Analyzer.PARAMS))))
         return Model(params, kind)
 
-    def _pick_hardcoded(self):
-        return Model(["mean", "percentile_95"], "ANY")
+

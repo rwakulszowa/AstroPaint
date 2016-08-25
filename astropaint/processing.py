@@ -1,3 +1,4 @@
+import json
 import random
 import uuid
 
@@ -9,11 +10,12 @@ import skimage.morphology
 
 import astropaint.base
 
+import config
+
 
 class Processed(astropaint.base.BaseObject):
-    def __init__(self, filter, image_path, evaluation, id=None):
+    def __init__(self, filter, evaluation, id=None):
         self.filter = filter
-        self.image_path = image_path
         self.evaluation = evaluation
         self.id = id or uuid.uuid4().hex
 
@@ -31,6 +33,14 @@ class Filter(astropaint.base.BaseObject):
     @classmethod
     def undictify(cls, data):
         return Filter(**data)
+
+    def mutate(self):
+        steps = []
+        for s in self.steps:
+            method = next(m for m in Processor.METHODS if m.name == s["method"])  # find ProcessorMethod for a given step
+            steps.append(method.sample())
+        random.shuffle(steps)
+        return Filter(steps, self.kind)
 
 
 class ProcessorMethod(object):
@@ -70,16 +80,16 @@ class Processor(object):
 
     def execute(self):
         filter = FilterPicker(self.db, self.classed).pick()
-        image_path = "./temp/{}.png".format(random.randint(0, 100))
         evaluation = []
         data = self._process(filter)
-        self._save(data, image_path)
-        processed = Processed(filter, image_path, evaluation)
+        processed = Processed(filter, evaluation)
+        self._save(data, processed.id)
         self._put_into_db(processed)
         return processed
 
     @staticmethod
-    def _save(data, path):
+    def _save(data, id):
+        path = config.STORAGE_DIR + id + ".png"
         skimage.io.imsave(path, data)
 
     def _put_into_db(self, o):
@@ -143,7 +153,26 @@ class FilterPicker(astropaint.base.BasePicker):
         self.classed = classed
 
     def _get_state(self):
-        return "dumb"
+        evaluated_count = len(self.db.get_processed_by_kind(kind=self.classed.layout.kind))
+        return "dumb" if evaluated_count < 10 else "learning"
+
+    def _pick_best(self):
+        kind = self.classed.layout.kind
+        processed = self.db.get_processed_by_kind(kind=kind)
+        #TODO: apply simple machine learning here -> guess params (only params values) based on previously processed and some classification score
+        best_filter = processed[0].filter
+        return best_filter
+
+    def _pick_creative(self):
+        coverage = 0.1
+        kind = self.classed.layout.kind
+        processed = self.db.get_processed_by_kind(kind=kind)
+        covered_processed = processed[:round(coverage * len(processed))]
+        selected_filter = random.choice(covered_processed).filter
+        return selected_filter.mutate()
+
+    def _pick_hardcoded(self):
+        return Filter([{"method": "stretch", "params": [2, 99.5]}], "ANY")
 
     def _pick_random(self):
         kind = self.classed.layout.kind
@@ -152,13 +181,3 @@ class FilterPicker(astropaint.base.BasePicker):
         steps = random.sample(methods, random.randint(1, len(methods)))
         steps = [s.sample() for s in steps]
         return Filter(steps, kind)
-
-    def _pick_hardcoded(self):
-        return Filter([{"method": "stretch", "params": [2, 99.5]}], "ANY")
-
-    def _pick_best(self):
-        kind = self.classed.layout.kind
-        processed = self.db.get_processed_by_kind(kind=kind)
-        best_filter = processed[0].filter
-        return best_filter
-
