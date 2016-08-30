@@ -3,10 +3,14 @@ import random
 import uuid
 
 import numpy as np
+import scipy.optimize
 import skimage.io
 import skimage.exposure
 import skimage.filters
 import skimage.morphology
+import sklearn.linear_model
+import sklearn.pipeline
+import sklearn.preprocessing
 
 import astropaint.base
 
@@ -35,12 +39,26 @@ class Filter(astropaint.base.BaseObject):
         return Filter(**data)
 
     def mutate(self):
-        steps = []
-        for s in self.steps:
-            method = next(m for m in Processor.METHODS if m.name == s["method"])  # find ProcessorMethod for a given step
-            steps.append(method.sample())
+        methods = self.get_methods()
+        steps = [methods[n].sample() for n in self.get_method_names()]
         random.shuffle(steps)
         return Filter(steps, self.kind)
+
+    def has_step(self, step):
+        return step["method"] in [s["method"] for s in self.steps]
+
+    def get_step(self, step):
+        try:
+            return next(s for s in self.steps if s["method"] == step)
+        except StopIteration:
+            return None
+
+    def get_method_names(self):
+        return [s["method"] for s in self.steps]
+
+    def get_methods(self):
+        method_names = self.get_method_names()
+        return {m.name: m for m in Processor.METHODS if m.name in method_names}
 
 
 class ProcessorMethod(object):
@@ -153,18 +171,66 @@ class FilterPicker(astropaint.base.BasePicker):
         self.classed = classed
 
     def _get_state(self):
-        evaluated_count = len(self.db.get_processed_by_kind(kind=self.classed.layout.kind))
-        return "dumb" if evaluated_count < 10 else "learning"
+        evaluated = self.db.get_processed_by_kind(kind=self.classed.layout.kind)
+        evaluated_count = len(evaluated)
+        if evaluated_count < 10:
+            return "dumb"
+        elif 10 <= evaluated_count < 20:
+            return "learning"
+        elif 20 <= evaluated_count:
+            return "smart"
+        else:
+            return "unknown"
 
     def _pick_best(self):
+        coverage = 1.0
         kind = self.classed.layout.kind
         processed = self.db.get_processed_by_kind(kind=kind)
-        #TODO: apply simple machine learning here -> guess params (only params values) based on previously processed and some classification score
         best_filter = processed[0].filter
-        return best_filter
+        covered_processed = processed[:round(coverage * len(processed))]
+        similar_processed = [p for p in covered_processed
+                             if p.filter.get_method_names() == best_filter.get_method_names()]
+        steps = self._predict_steps(similar_processed)
+        return Filter(steps, kind)
+
+    def _predict_steps(self, processed_before, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item
+        best_filter = processed_before[0].filter
+        steps = best_filter.steps
+        bounds = self._unwrap([m.params for m in best_filter.get_methods().values()])
+        Y = [p.evaluation[0] for p in processed_before]
+        X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed_before]
+        model = sklearn.pipeline.Pipeline([('poly', sklearn.preprocessing.PolynomialFeatures(degree=2)),
+                                           ('linear', sklearn.linear_model.LinearRegression())])
+        model = model.fit(X, Y)
+        params = self._optimize(model, bounds, self._unwrap([s["params"] for s in best_filter.steps]))
+        optimal_steps = self._wrap_values(steps, params)
+        return optimal_steps
+
+    @staticmethod
+    def _unwrap(arr):
+        ans = []
+        for a in arr:
+            ans.extend(a)
+        return ans
+
+    @staticmethod
+    def _wrap_values(steps, values):
+        steps = steps.copy()
+        values = iter(values)
+        for s in steps:
+            for i, _ in enumerate(s["params"]):
+                s["params"][i] = next(values)
+        return steps
+
+    @staticmethod
+    def _optimize(model, bounds, initial_guess):
+        def fun(X):
+            return -model.predict(X.reshape(1, -1))
+        res = scipy.optimize.minimize(fun, initial_guess, bounds=bounds)
+        return res.x
 
     def _pick_creative(self):
-        coverage = 0.1
+        coverage = 0.4
         kind = self.classed.layout.kind
         processed = self.db.get_processed_by_kind(kind=kind)
         covered_processed = processed[:round(coverage * len(processed))]
