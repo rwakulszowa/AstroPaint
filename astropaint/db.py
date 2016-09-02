@@ -30,8 +30,8 @@ class Db(object):
         rows = [self._unpack_row(r.value) for r in view.rows]
         return [astropaint.analysis.Analyzed.undictify(r) for r in rows]
 
-    def get_processed_by_kind(self, kind):
-        view = self.processing_db.view("astro/processed_by_kind", startkey=[kind, 100], endkey=[kind, 0], descending=True)
+    def get_processed_evaluated(self):
+        view = self.processing_db.view("astro/processed_evaluated", descending=True)
         rows = [self._unpack_row(r.value) for r in view.rows]
         return [astropaint.processing.Processed.undictify(r) for r in rows]
 

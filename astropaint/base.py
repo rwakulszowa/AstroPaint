@@ -1,8 +1,15 @@
+from collections import OrderedDict
+
+
 class BaseObject(object):
     """Base class for all objects stored in the database"""
     def dictify(self) -> dict:
-        return {k: v.dictify() if hasattr(v, 'dictify') else v
-                for k, v in self.__dict__.items()}
+        d = self.__dict__
+        return OrderedDict([(k, v.dictify() if hasattr(v, 'dictify') else v)
+                            for k, v in sorted(d.items())])
+
+    def __repr__(self):
+        return str(self.dictify())
 
     @classmethod
     def undictify(cls, data: dict) -> "BaseObject":

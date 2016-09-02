@@ -18,7 +18,8 @@ import config
 
 
 class Processed(astropaint.base.BaseObject):
-    def __init__(self, filter, evaluation, id=None):
+    def __init__(self, cluster, filter, evaluation, id=None):
+        self.cluster = cluster
         self.filter = filter
         self.evaluation = evaluation
         self.id = id or uuid.uuid4().hex
@@ -30,9 +31,8 @@ class Processed(astropaint.base.BaseObject):
 
 
 class Filter(astropaint.base.BaseObject):
-    def __init__(self, steps, kind):
+    def __init__(self, steps):
         self.steps = steps
-        self.kind = kind
 
     @classmethod
     def undictify(cls, data):
@@ -42,7 +42,7 @@ class Filter(astropaint.base.BaseObject):
         methods = self.get_methods()
         steps = [methods[n].sample() for n in self.get_method_names()]
         random.shuffle(steps)
-        return Filter(steps, self.kind)
+        return Filter(steps)
 
     def has_step(self, step):
         return step["method"] in [s["method"] for s in self.steps]
@@ -100,7 +100,7 @@ class Processor(object):
         filter = FilterPicker(self.db, self.classed).pick()
         evaluation = []
         data = self._process(filter)
-        processed = Processed(filter, evaluation)
+        processed = Processed(self.classed.get_cluster_data(), filter, evaluation)
         self._save(data, processed.id)
         self._put_into_db(processed)
         return processed
@@ -169,10 +169,11 @@ class FilterPicker(astropaint.base.BasePicker):
     def __init__(self, db, classed):
         self.db = db
         self.classed = classed
+        self.evaluated = self.db.get_processed_evaluated()
 
     def _get_state(self):
-        evaluated = self.db.get_processed_by_kind(kind=self.classed.layout.kind)
-        evaluated_count = len(evaluated)
+        evaluated_count = len(self.evaluated)
+        return "smart"
         if evaluated_count < 10:
             return "dumb"
         elif 10 <= evaluated_count < 20:
@@ -183,27 +184,23 @@ class FilterPicker(astropaint.base.BasePicker):
             return "unknown"
 
     def _pick_best(self):
-        coverage = 1.0
-        kind = self.classed.layout.kind
-        processed = self.db.get_processed_by_kind(kind=kind)
-        best_filter = processed[0].filter
-        covered_processed = processed[:round(coverage * len(processed))]
-        similar_processed = [p for p in covered_processed
-                             if p.filter.get_method_names() == best_filter.get_method_names()]
+        best_filter = self.evaluated[0].filter
+        similar_processed = [p for p in self.evaluated
+                             if p.filter.get_method_names() == best_filter.get_method_names()]  #TODO: filter by cluster -> if not enough found, return best_filter
+        #TODO: use self.classed and filter.cluster as an argument to _predict_steps
         steps = self._predict_steps(similar_processed)
-        return Filter(steps, kind)
+        return Filter(steps)
 
-    def _predict_steps(self, processed_before, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item
-        best_filter = processed_before[0].filter
-        steps = best_filter.steps
+    def _predict_steps(self, processed, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item
+        best_filter = processed[0].filter
         bounds = self._unwrap([m.params for m in best_filter.get_methods().values()])
-        Y = [p.evaluation[0] for p in processed_before]
-        X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed_before]
+        Y = [p.evaluation[0] for p in processed]
+        X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed]
         model = sklearn.pipeline.Pipeline([('poly', sklearn.preprocessing.PolynomialFeatures(degree=2)),
                                            ('linear', sklearn.linear_model.LinearRegression())])
         model = model.fit(X, Y)
         params = self._optimize(model, bounds, self._unwrap([s["params"] for s in best_filter.steps]))
-        optimal_steps = self._wrap_values(steps, params)
+        optimal_steps = self._wrap_values(best_filter.steps, params)
         return optimal_steps
 
     @staticmethod
@@ -231,19 +228,17 @@ class FilterPicker(astropaint.base.BasePicker):
 
     def _pick_creative(self):
         coverage = 0.4
-        kind = self.classed.layout.kind
-        processed = self.db.get_processed_by_kind(kind=kind)
-        covered_processed = processed[:round(coverage * len(processed))]
-        selected_filter = random.choice(covered_processed).filter
+        evaluated = self.evaluated
+        covered = evaluated[:round(coverage * len(evaluated))]
+        selected_filter = random.choice(covered).filter
         return selected_filter.mutate()
 
     def _pick_hardcoded(self):
         return Filter([{"method": "stretch", "params": [2, 99.5]}], "ANY")
 
     def _pick_random(self):
-        kind = self.classed.layout.kind
         methods = Processor.METHODS[:]
         random.shuffle(methods)
         steps = random.sample(methods, random.randint(1, len(methods)))
         steps = [s.sample() for s in steps]
-        return Filter(steps, kind)
+        return Filter(steps)
