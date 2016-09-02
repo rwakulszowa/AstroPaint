@@ -60,6 +60,11 @@ class Filter(astropaint.base.BaseObject):
         method_names = self.get_method_names()
         return {m.name: m for m in Processor.METHODS if m.name in method_names}
 
+    def get_bounds(self):
+        steps = self.get_method_names()
+        methods = self.get_methods()
+        return [methods[s].params for s in steps]
+
 
 class ProcessorMethod(object):
     def __init__(self, name, params):
@@ -193,7 +198,7 @@ class FilterPicker(astropaint.base.BasePicker):
 
     def _predict_steps(self, processed, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item
         best_filter = processed[0].filter
-        bounds = self._unwrap([m.params for m in best_filter.get_methods().values()])
+        bounds = self._unwrap(best_filter.get_bounds())
         Y = [p.evaluation for p in processed]
         X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed]
         model = sklearn.pipeline.Pipeline([('poly', sklearn.preprocessing.PolynomialFeatures(degree=2)),
