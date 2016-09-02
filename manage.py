@@ -31,11 +31,11 @@ def evaluate():
     ids = [i.split('.')[0] for i in _get_images()]
     for id in ids:
         processed = db[id]
-        if len(processed["evaluation"]) == 0:
+        if processed["evaluation"] is None:
             im = PIL.Image.open(config.STORAGE_DIR + id + ".png")
             im.show()
             e = input("Evaluate (0-100):")
-            processed["evaluation"].append(int(e))
+            processed["evaluation"] = (int(e))
             db[id] = processed
 
 def _get_images():

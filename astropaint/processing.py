@@ -98,7 +98,7 @@ class Processor(object):
 
     def execute(self):
         filter = FilterPicker(self.db, self.classed).pick()
-        evaluation = []
+        evaluation = None
         data = self._process(filter)
         processed = Processed(self.classed.get_cluster_data(), filter, evaluation)
         self._save(data, processed.id)
@@ -194,7 +194,7 @@ class FilterPicker(astropaint.base.BasePicker):
     def _predict_steps(self, processed, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item
         best_filter = processed[0].filter
         bounds = self._unwrap([m.params for m in best_filter.get_methods().values()])
-        Y = [p.evaluation[0] for p in processed]
+        Y = [p.evaluation for p in processed]
         X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed]
         model = sklearn.pipeline.Pipeline([('poly', sklearn.preprocessing.PolynomialFeatures(degree=2)),
                                            ('linear', sklearn.linear_model.LinearRegression())])
