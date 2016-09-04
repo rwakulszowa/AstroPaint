@@ -7,7 +7,8 @@ import astropaint.base
 
 
 class Classed(astropaint.base.BaseObject):
-    def __init__(self, layout, cluster, id=None):
+    def __init__(self, features, layout, cluster, id=None):
+        self.features = features
         self.layout = layout
         self.cluster = cluster
         self.id = id or uuid.uuid4().hex
@@ -17,15 +18,16 @@ class Classed(astropaint.base.BaseObject):
         data["layout"] = Layout.undictify(data["layout"])
         return Classed(**data)
 
+    def save(self, db):
+        db.put_classed(self)
+
     def get_cluster_data(self):
-        return {k:v for k, v in zip(self.layout.features, self.layout.clusters[self.cluster])}
+        return {k:v for k, v in zip(self.features, self.layout.clusters[self.cluster])}
 
 
 class Layout(astropaint.base.BaseObject):
-    def __init__(self, clusters, features, kind):
+    def __init__(self, clusters):
         self.clusters = clusters
-        self.features = features
-        self.kind = kind
 
     @classmethod
     def undictify(cls, data):
@@ -39,14 +41,11 @@ class Classifier(object):
         self.raw = raw
 
     def execute(self):
-        layout = LayoutPicker(self.db, self.analyzed).pick()
+        layout, state = LayoutPicker(self.db, self.analyzed).pick()
         cluster = self._classify(self.analyzed, layout)
-        classed = Classed(layout, cluster)
-        self._put_into_db(classed)
+        classed = Classed(self.analyzed.model.params, layout, cluster)
+        classed.save(self.db)
         return classed
-
-    def _put_into_db(self, o):
-        return self.db.put_classed(o)
 
     @classmethod
     def _classify(cls, analyzed, layout):
@@ -62,23 +61,30 @@ class LayoutPicker(astropaint.base.BasePicker):
     def __init__(self, db, analyzed):
         self.db = db
         self.analyzed = analyzed
+        self.analyzed_before = self.db.get_analyzed_by_model(model=self.analyzed.model)
 
-    def _get_state(self):  #TODO: do not create new layouts too often
-        model = self.analyzed.model
-        analyzed_count = len(self.db.get_analyzed_by_model(model=model))
-        if analyzed_count < 2 ** len(self.analyzed.params):
-            return "unknown"
-        else:
-            return "learning"
+    def _get_state(self):
+        analyzed_count = len(self.analyzed_before)
+        threshold = 16
+        if analyzed_count < threshold:
+            state = "unknown"  #TODO: refactor base.get_state
+        elif analyzed_count == threshold:  # build a layout only once
+            state = "learning"
+        elif analyzed_count > threshold:
+            state = "smart"
+        return state
+
+    def _pick_best(self):
+        classed = self.db.get_classed_by_features(features=self.analyzed.model.params)[0]
+        return classed.layout
 
     def _pick_creative(self):
         model = self.analyzed.model
-        analyzed_before = self.db.get_analyzed_by_model(model=model)
         clusters_count = 2 ** len(self.analyzed.params)
         fitter = sklearn.cluster.KMeans(n_clusters=clusters_count)
-        data = [a.params for a in analyzed_before]
+        data = [a.params for a in self.analyzed_before]
         fitter.fit(data)
-        return Layout(sorted(fitter.cluster_centers_.tolist()), model.params, model.kind)
+        return Layout(sorted(fitter.cluster_centers_.tolist()))
 
     def _pick_hardcoded(self):
-        return Layout([[0.25], [0.75]], ["mean"], "ANY")
+        return Layout([[]])

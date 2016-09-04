@@ -15,19 +15,23 @@ class BaseObject(object):
     def undictify(cls, data: dict) -> "BaseObject":
         raise NotImplementedError
 
+    def save(self, db):
+        raise NotImplementedError
+
 
 class BasePicker(object):
     def pick(self):
         state = self._get_state()
-        return {
+        pick_method = {
             "unknown": self._pick_hardcoded,
             "dumb": self._pick_random,
             "learning": self._pick_creative,
             "smart": self._pick_best
-        }[state]()
+        }[state]
+        return pick_method(), state
 
     def _get_state(self):
-        return "unknown"  #TODO
+        return "unknown"
 
     def _pick_hardcoded(self):
         raise NotImplementedError

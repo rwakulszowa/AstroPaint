@@ -30,6 +30,11 @@ class Db(object):
         rows = [self._unpack_row(r.value) for r in view.rows]
         return [astropaint.analysis.Analyzed.undictify(r) for r in rows]
 
+    def get_classed_by_features(self, features):
+        view = self.classification_db.view("astro/classed_by_features", key=features)
+        rows = [self._unpack_row(r.value) for r in view.rows]
+        return [astropaint.classification.Classed.undictify(r) for r in rows]
+
     def get_processed_evaluated(self):
         view = self.processing_db.view("astro/processed_evaluated", descending=True)
         rows = [self._unpack_row(r.value) for r in view.rows]

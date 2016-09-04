@@ -29,6 +29,9 @@ class Processed(astropaint.base.BaseObject):
         data["filter"] = Filter.undictify(data["filter"])
         return Processed(**data)
 
+    def save(self, db):
+        return db.put_processed(self)
+
 
 class Filter(astropaint.base.BaseObject):
     def __init__(self, steps):
@@ -102,21 +105,18 @@ class Processor(object):
         self.raw = raw
 
     def execute(self):
-        filter = FilterPicker(self.db, self.classed).pick()
+        filter, state = FilterPicker(self.db, self.classed).pick()
         evaluation = None
         data = self._process(filter)
         processed = Processed(self.classed.get_cluster_data(), filter, evaluation)
-        self._save(data, processed.id)
-        self._put_into_db(processed)
+        self._save_image(data, processed.id)
+        processed.save(self.db)
         return processed
 
     @staticmethod
-    def _save(data, id):
+    def _save_image(data, id):
         path = config.STORAGE_DIR + id + ".png"
         skimage.io.imsave(path, data)
-
-    def _put_into_db(self, o):
-        return self.db.put_processed(o)
 
     def _process(self, filter):
         data = self.raw.data
@@ -178,15 +178,13 @@ class FilterPicker(astropaint.base.BasePicker):
 
     def _get_state(self):
         evaluated_count = len(self.evaluated)
-        return "smart"
         if evaluated_count < 10:
-            return "dumb"
-        elif 10 <= evaluated_count < 20:
-            return "learning"
+            state = "dumb"
+        elif 10 <= evaluated_count < 20 or self.evaluated[0].evaluation < 25:
+            state = "learning"
         elif 20 <= evaluated_count:
-            return "smart"
-        else:
-            return "unknown"
+            state = "smart"
+        return state
 
     def _pick_best(self):
         best_filter = self.evaluated[0].filter
@@ -228,7 +226,7 @@ class FilterPicker(astropaint.base.BasePicker):
     def _optimize(model, bounds, initial_guess):
         def fun(X):
             return -model.predict(X.reshape(1, -1))
-        res = scipy.optimize.minimize(fun, initial_guess, bounds=bounds)
+        res = scipy.optimize.minimize(fun, initial_guess, bounds=bounds)  #TODO: assign weights to best samples or simply duplicate them
         return res.x
 
     def _pick_creative(self):

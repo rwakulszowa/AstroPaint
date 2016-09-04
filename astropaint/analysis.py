@@ -17,6 +17,9 @@ class Analyzed(astropaint.base.BaseObject):
         data["model"] = Model.undictify(data["model"])
         return Analyzed(**data)
 
+    def save(self, db):
+        return db.put_analyzed(self)
+
 
 class Model(astropaint.base.BaseObject):
     def __init__(self, params, kind):
@@ -36,14 +39,11 @@ class Analyzer(object):
         self.raw = raw
 
     def execute(self):
-        model = ModelPicker(self.db, self.raw).pick()
+        model, state = ModelPicker(self.db, self.raw).pick()
         params = self._analyze(model)
         analyzed = Analyzed(model, params)
-        self._put_into_db(analyzed)
+        analyzed.save(self.db)
         return analyzed
-
-    def _put_into_db(self, o):
-        return self.db.put_analyzed(o)
 
     def _analyze(self, model):
         return [self._compute(param) for param in model.params]
