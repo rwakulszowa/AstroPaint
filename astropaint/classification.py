@@ -22,7 +22,7 @@ class Classed(astropaint.base.BaseObject):
         db.put_classed(self)
 
     def get_cluster_data(self):
-        return {k:v for k, v in zip(self.features, self.layout.clusters[self.cluster])}
+        return OrderedDict([(k, v) for k, v in zip(self.features, self.layout.clusters[self.cluster])])
 
 
 class Layout(astropaint.base.BaseObject):

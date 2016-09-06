@@ -175,26 +175,41 @@ class FilterPicker(astropaint.base.BasePicker):
         self.db = db
         self.classed = classed
         self.evaluated = self.db.get_processed_evaluated()
+        self.evaluated_within_cluster = [e for e in self.evaluated if e.cluster == self.classed.get_cluster_data()]
 
     def _get_state(self):
         evaluated_count = len(self.evaluated)
+        within_cluster_count = len(self.evaluated_within_cluster)
+        blueprint = self._get_blueprint()
         if evaluated_count < 10:
             state = "dumb"
-        elif 10 <= evaluated_count < 20 or self.evaluated[0].evaluation < 25:
+        elif 10 <= evaluated_count < 20 or blueprint.evaluation < 25:
             state = "learning"
         elif 20 <= evaluated_count:
             state = "smart"
         return state
 
+    def _get_blueprint(self):
+        if len(self.evaluated_within_cluster) > 0:
+            blueprint = self.evaluated_within_cluster[0]
+        elif len(self.evaluated) > 0:
+            blueprint = self.evaluated[0]
+        else:
+            blueprint = None
+        return blueprint
+
     def _pick_best(self):
-        best_filter = self.evaluated[0].filter
-        similar_processed = [p for p in self.evaluated
-                             if p.filter.get_method_names() == best_filter.get_method_names()]  #TODO: filter by cluster -> if not enough found, return best_filter
+        blueprint = self._get_blueprint()
+        similar_processed = [p for p in self.evaluated_within_cluster
+                             if p.filter.get_method_names() == blueprint.filter.get_method_names()]
         #TODO: use self.classed and filter.cluster as an argument to _predict_steps
-        steps = self._predict_steps(similar_processed)
+        if len(similar_processed) > 0:
+            steps = self._predict_steps(similar_processed)
+        else:
+            steps = blueprint.filter.steps
         return Filter(steps)
 
-    def _predict_steps(self, processed, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item
+    def _predict_steps(self, processed, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item;
         best_filter = processed[0].filter
         bounds = self._unwrap(best_filter.get_bounds())
         Y = [p.evaluation for p in processed]
@@ -230,11 +245,7 @@ class FilterPicker(astropaint.base.BasePicker):
         return res.x
 
     def _pick_creative(self):
-        coverage = 0.4
-        evaluated = self.evaluated
-        covered = evaluated[:round(coverage * len(evaluated))]
-        selected_filter = random.choice(covered).filter
-        return selected_filter.mutate()
+        return self._get_blueprint().filter.mutate()
 
     def _pick_hardcoded(self):
         return Filter([{"method": "stretch", "params": [2, 99.5]}], "ANY")
