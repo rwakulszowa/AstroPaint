@@ -18,7 +18,6 @@ class Raw(object):
         self.data = np.dstack([self._preprocess(self._read(u, "./temp/{}".format(p)), size=size)
                                for u, p in zip(self.urls, self.encoded_urls)])
 
-
     @classmethod
     def _read(cls, url, path):
         try:
