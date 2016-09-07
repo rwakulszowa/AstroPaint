@@ -1,3 +1,4 @@
+import itertools
 import json
 import random
 import uuid
@@ -183,7 +184,7 @@ class FilterPicker(astropaint.base.BasePicker):
         blueprint = self._get_blueprint()
         if evaluated_count < 10:
             state = "dumb"
-        elif 10 <= evaluated_count < 20 or blueprint.evaluation < 25:
+        elif 10 <= evaluated_count < 20 or within_cluster_count < 5 or blueprint.evaluation < 25:
             state = "learning"
         elif 20 <= evaluated_count:
             state = "smart"
@@ -202,20 +203,19 @@ class FilterPicker(astropaint.base.BasePicker):
         blueprint = self._get_blueprint()
         similar_processed = [p for p in self.evaluated_within_cluster
                              if p.filter.get_method_names() == blueprint.filter.get_method_names()]
-        #TODO: use self.classed and filter.cluster as an argument to _predict_steps
         if len(similar_processed) > 0:
             steps = self._predict_steps(similar_processed)
         else:
             steps = blueprint.filter.steps
         return Filter(steps)
 
-    def _predict_steps(self, processed, classed_param = None):  #TODO: will accept some kinda parameter of the currently processed item;
+    def _predict_steps(self, processed):
         best_filter = processed[0].filter
         bounds = self._unwrap(best_filter.get_bounds())
         Y = [p.evaluation for p in processed]
         X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed]
         model = sklearn.pipeline.Pipeline([('poly', sklearn.preprocessing.PolynomialFeatures(degree=2)),
-                                           ('linear', sklearn.linear_model.LinearRegression())])
+                                           ('linear', sklearn.linear_model.Ridge())])
         model = model.fit(X, Y)
         params = self._optimize(model, bounds, self._unwrap([s["params"] for s in best_filter.steps]))
         optimal_steps = self._wrap_values(best_filter.steps, params)
@@ -241,7 +241,7 @@ class FilterPicker(astropaint.base.BasePicker):
     def _optimize(model, bounds, initial_guess):
         def fun(X):
             return -model.predict(X.reshape(1, -1))
-        res = scipy.optimize.minimize(fun, initial_guess, bounds=bounds)  #TODO: assign weights to best samples or simply duplicate them
+        res = scipy.optimize.minimize(fun, initial_guess, bounds=bounds)
         return res.x
 
     def _pick_creative(self):
