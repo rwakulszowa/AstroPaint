@@ -7,7 +7,7 @@ import numpy as np
 import scipy.optimize
 import skimage.io
 import skimage.exposure
-import skimage.filters
+import skimage.filters.rank
 import skimage.morphology
 import sklearn.linear_model
 import sklearn.pipeline
@@ -93,11 +93,12 @@ class ProcessorMethod(object):
 
 class Processor(object):
     METHODS = [ProcessorMethod(name, params) for name, params in [
-        ("stretch", [(0, 5), (98, 100)]),
-        ("adjust_gamma", [(0, 2)]),
+        ("stretch", [(0, 5), (95, 100)]),
+        ("adjust_gamma", [(0, 5)]),
         ("adjust_log", []),
         ("adjust_sigmoid", [(0, 1)]),
-        ("median", [])
+        ("equalize_adapthist", []),
+        ("median", [(1, 10)])
     ]]
 
     def __init__(self, db, classed, raw):
@@ -132,6 +133,8 @@ class Processor(object):
             "adjust_gamma": self._apply_adjust_gamma,
             "adjust_log": self._apply_adjust_log,
             "adjust_sigmoid": self._apply_adjust_sigmoid,
+            "equalize_adapthist": self._apply_equalize_adapthist,
+            "autolevel": self._apply_autolevel,
             "median": self._apply_median,
         }[step['method']](data, step['params'])
 
@@ -157,6 +160,20 @@ class Processor(object):
         ])
 
     @staticmethod
+    def _apply_equalize_adapthist(data, params):
+        return np.dstack([
+            skimage.exposure.equalize_adapthist(d)
+            for d in [data[:,:,i] for i in range(data.shape[-1])]
+        ])
+
+    @staticmethod
+    def _apply_autolevel(data, params):
+        return np.dstack([
+            skimage.filters.rank.autolevel(d)
+            for d in [data[:,:,i] for i in range(data.shape[-1])]
+        ])
+
+    @staticmethod
     def _apply_stretch(data, params):
         return np.dstack([
             skimage.exposure.rescale_intensity(d, in_range=tuple(np.percentile(d, params)))
@@ -166,7 +183,7 @@ class Processor(object):
     @staticmethod
     def _apply_median(data, params):
         return np.dstack([
-            skimage.filters.median(d, selem=skimage.morphology.disk(3))
+            skimage.filters.rank.median(d, selem=skimage.morphology.disk(round(params[0])))
             for d in [data[:,:,i] for i in range(data.shape[-1])]
         ])
 
@@ -182,11 +199,11 @@ class FilterPicker(astropaint.base.BasePicker):
         evaluated_count = len(self.evaluated)
         within_cluster_count = len(self.evaluated_within_cluster)
         blueprint = self._get_blueprint()
-        if evaluated_count < 10:
+        if evaluated_count < 25:
             state = "dumb"
-        elif 10 <= evaluated_count < 20 or within_cluster_count < 5 or blueprint.evaluation < 25:
+        elif 25 <= evaluated_count < 50 or within_cluster_count < 5 or blueprint.evaluation < 25:
             state = "learning"
-        elif 20 <= evaluated_count:
+        elif 50 <= evaluated_count:
             state = "smart"
         return state
 
@@ -215,7 +232,7 @@ class FilterPicker(astropaint.base.BasePicker):
         Y = [p.evaluation for p in processed]
         X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed]
         model = sklearn.pipeline.Pipeline([('poly', sklearn.preprocessing.PolynomialFeatures(degree=2)),
-                                           ('linear', sklearn.linear_model.Ridge())])
+                                           ('linear', sklearn.linear_model.ElasticNet())])
         model = model.fit(X, Y)
         params = self._optimize(model, bounds, self._unwrap([s["params"] for s in best_filter.steps]))
         optimal_steps = self._wrap_values(best_filter.steps, params)
