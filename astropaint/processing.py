@@ -86,7 +86,7 @@ class ProcessorMethod(object):
     def _sample_param(param):
         domain = "fixed" if type(param) is set else "cont"
         if domain is "fixed":
-            return random.sample(param, k=1)
+            return random.sample(param, k=1)[0]
         elif domain is "cont":
             return random.uniform(param[0], param[1])
 
@@ -98,7 +98,7 @@ class Processor(object):
         ("adjust_log", []),
         ("adjust_sigmoid", [(0, 1)]),
         ("equalize_adapthist", []),
-        ("median", [(1, 10)])
+        ("median", [{i for i in range(1, 10)}])
     ]]
 
     def __init__(self, db, classed, raw):
@@ -183,7 +183,7 @@ class Processor(object):
     @staticmethod
     def _apply_median(data, params):
         return np.dstack([
-            skimage.filters.rank.median(d, selem=skimage.morphology.disk(round(params[0])))
+            skimage.filters.rank.median(d, selem=skimage.morphology.disk(params[0]))
             for d in [data[:,:,i] for i in range(data.shape[-1])]
         ])
 
