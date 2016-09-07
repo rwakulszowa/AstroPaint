@@ -34,7 +34,7 @@ def evaluate():
         if processed["evaluation"] is None:
             im = PIL.Image.open(config.STORAGE_DIR + id + ".png")
             im.show()
-            e = input("Evaluate (0-100):")
+            e = input("Evaluate {} (0-100):".format(id))
             processed["evaluation"] = (int(e))
             db[id] = processed
 
