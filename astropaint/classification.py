@@ -1,9 +1,12 @@
 from collections import OrderedDict
 import uuid
+import logging
 
 import sklearn.cluster
 
 import astropaint.base
+
+logger = logging.getLogger(__name__)
 
 
 class Classed(astropaint.base.BaseObject):
@@ -45,6 +48,7 @@ class Classifier(object):
         cluster = self._classify(self.analyzed, layout)
         classed = Classed(self.analyzed.model.params, layout, cluster)
         classed.save(self.db)
+        logger.debug(classed)
         return classed
 
     @classmethod
@@ -65,7 +69,7 @@ class LayoutPicker(astropaint.base.BasePicker):
 
     def _get_state(self):
         analyzed_count = len(self.analyzed_before)
-        threshold = 16
+        threshold = 1
         if analyzed_count < threshold:
             state = "unknown"  #TODO: refactor base.get_state
         elif analyzed_count == threshold:  # build a layout only once
@@ -80,7 +84,8 @@ class LayoutPicker(astropaint.base.BasePicker):
 
     def _pick_creative(self):
         model = self.analyzed.model
-        clusters_count = 2 ** len(self.analyzed.params)
+        # clusters_count = 2 ** len(self.analyzed.params)
+        clusters_count = 1
         fitter = sklearn.cluster.KMeans(n_clusters=clusters_count)
         data = [a.params for a in self.analyzed_before]
         fitter.fit(data)

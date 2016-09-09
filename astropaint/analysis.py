@@ -1,10 +1,15 @@
 import uuid
 import random
+import logging
 
 import numpy as np
 import astropy.modeling
+import skimage.exposure
+import skimage.feature
 
 import astropaint.base
+
+logger = logging.getLogger(__name__)
 
 
 class Analyzed(astropaint.base.BaseObject):
@@ -36,7 +41,7 @@ class Analyzer(object):
     MODELS = {kind: Model(kind, params) for kind, params in [
         ("ANY", ["mean", "percentile_95", "shape"]),
         ("GALAXY", ["mean", "percentile_5", "percentile_95", "shape"]),
-        ("CLUSTER", ["mean", "percentile_5", "percentile_95"]),  #TODO
+        ("CLUSTER", ["mean", "percentile_5", "percentile_95", "object_count"]),
         ("NEBULA", ["mean", "percentile_5"])  #TODO
     ]}
 
@@ -49,6 +54,7 @@ class Analyzer(object):
         params = self._analyze(model)
         analyzed = Analyzed(model, params)
         analyzed.save(self.db)
+        logger.debug(analyzed)
         return analyzed
 
     def _analyze(self, model):
@@ -57,6 +63,7 @@ class Analyzer(object):
     def _compute(self, param):
         return {
             "mean": self._compute_mean,
+            "object_count": self._compute_object_count,
             "percentile_5": self._compute_percentile_5,
             "percentile_95": self._compute_percentile_95,
             "shape": self._compute_shape
@@ -64,6 +71,12 @@ class Analyzer(object):
 
     def _compute_mean(self):
         return self.raw.data.mean()
+
+    def _compute_object_count(self):
+        data = self.raw.data[:, :, 0]
+        data = skimage.exposure.equalize_adapthist(data)
+        lm = skimage.feature.peak_local_max(data, threshold_abs=np.percentile(data, 95), min_distance=10)
+        return len(lm)
 
     def _compute_percentile_5(self):
         return np.percentile(self.raw.data, 5)

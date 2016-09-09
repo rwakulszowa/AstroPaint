@@ -2,6 +2,7 @@ import itertools
 import json
 import random
 import uuid
+import logging
 
 import numpy as np
 import scipy.optimize
@@ -14,8 +15,11 @@ import sklearn.pipeline
 import sklearn.preprocessing
 
 import astropaint.base
+import astropaint.utils
 
 import config
+
+logger = logging.getLogger(__name__)
 
 
 class Processed(astropaint.base.BaseObject):
@@ -93,12 +97,13 @@ class ProcessorMethod(object):
 
 class Processor(object):
     METHODS = [ProcessorMethod(name, params) for name, params in [
-        ("stretch", [(0, 5), (95, 100)]),
-        ("adjust_gamma", [(0, 5)]),
+        ("stretch", [(0, 10), (90, 100)]),
+        ("adjust_gamma", [(0.5, 2)]),
         ("adjust_log", []),
         ("adjust_sigmoid", [(0, 1)]),
-        ("equalize_adapthist", []),
-        ("median", [{i for i in range(1, 10)}])
+        ("median", [{i for i in range(1, 10)}]),
+        ("sharpen_laplace", [(0, 0.25)]),
+        ("sharpen_gaussian", [(0, 0.25)])
     ]]
 
     def __init__(self, db, classed, raw):
@@ -108,11 +113,13 @@ class Processor(object):
 
     def execute(self):
         filter, state = FilterPicker(self.db, self.classed).pick()
+        logger.debug("State: {}".format(state))
         evaluation = None
         data = self._process(filter)
         processed = Processed(self.classed.get_cluster_data(), filter, evaluation)
         self._save_image(data, processed.id)
         processed.save(self.db)
+        logger.debug(processed)
         return processed
 
     @staticmethod
@@ -133,59 +140,56 @@ class Processor(object):
             "adjust_gamma": self._apply_adjust_gamma,
             "adjust_log": self._apply_adjust_log,
             "adjust_sigmoid": self._apply_adjust_sigmoid,
-            "equalize_adapthist": self._apply_equalize_adapthist,
             "autolevel": self._apply_autolevel,
             "median": self._apply_median,
+            "sharpen_laplace": self._apply_sharpen_laplace,
+            "sharpen_gaussian": self._apply_sharpen_gaussian
         }[step['method']](data, step['params'])
 
     @staticmethod
+    @astropaint.utils.normalize
     def _apply_adjust_gamma(data, params):
-        return np.dstack([
-            skimage.exposure.adjust_gamma(d, gamma=params[0])
-            for d in [data[:,:,i] for i in range(data.shape[-1])]
-        ])
+        return skimage.exposure.adjust_gamma(data, gamma=params[0])
 
     @staticmethod
+    @astropaint.utils.normalize
     def _apply_adjust_log(data, params):
-        return np.dstack([
-            skimage.exposure.adjust_log(d)
-            for d in [data[:,:,i] for i in range(data.shape[-1])]
-        ])
+        return skimage.exposure.adjust_log(data)
 
     @staticmethod
+    @astropaint.utils.normalize
     def _apply_adjust_sigmoid(data, params):
-        return np.dstack([
-            skimage.exposure.adjust_sigmoid(d, cutoff=params[0])
-            for d in [data[:,:,i] for i in range(data.shape[-1])]
-        ])
+        return skimage.exposure.adjust_sigmoid(data, cutoff=params[0])
 
     @staticmethod
+    @astropaint.utils.normalize
     def _apply_equalize_adapthist(data, params):
-        return np.dstack([
-            skimage.exposure.equalize_adapthist(d)
-            for d in [data[:,:,i] for i in range(data.shape[-1])]
-        ])
+        return skimage.exposure.equalize_adapthist(data)
 
     @staticmethod
+    @astropaint.utils.normalize
     def _apply_autolevel(data, params):
-        return np.dstack([
-            skimage.filters.rank.autolevel(d)
-            for d in [data[:,:,i] for i in range(data.shape[-1])]
-        ])
+        return skimage.filters.rank.autolevel(data)
 
     @staticmethod
+    @astropaint.utils.normalize
     def _apply_stretch(data, params):
-        return np.dstack([
-            skimage.exposure.rescale_intensity(d, in_range=tuple(np.percentile(d, params)))
-            for d in [data[:,:,i] for i in range(data.shape[-1])]
-        ])
+        return skimage.exposure.rescale_intensity(data, in_range=tuple(np.percentile(data, params)))
 
     @staticmethod
+    @astropaint.utils.normalize
     def _apply_median(data, params):
-        return np.dstack([
-            skimage.filters.rank.median(d, selem=skimage.morphology.disk(params[0]))
-            for d in [data[:,:,i] for i in range(data.shape[-1])]
-        ])
+        return skimage.filters.rank.median(data, selem=skimage.morphology.disk(params[0]))
+
+    @staticmethod
+    @astropaint.utils.normalize
+    def _apply_sharpen_laplace(data, params):
+        return data + params[0] * (data - skimage.filters.laplace(data, ksize=3))
+
+    @staticmethod
+    @astropaint.utils.normalize
+    def _apply_sharpen_gaussian(data, params):
+        return data + params[0] * (data - skimage.filters.gaussian(data, sigma=1))
 
 
 class FilterPicker(astropaint.base.BasePicker):
@@ -199,11 +203,11 @@ class FilterPicker(astropaint.base.BasePicker):
         evaluated_count = len(self.evaluated)
         within_cluster_count = len(self.evaluated_within_cluster)
         blueprint = self._get_blueprint()
-        if evaluated_count < 25:
+        if evaluated_count < 20:
             state = "dumb"
-        elif 25 <= evaluated_count < 50 or within_cluster_count < 5 or blueprint.evaluation < 25:
+        elif 20 <= evaluated_count < 40 or within_cluster_count < 1 or blueprint.evaluation < 20:
             state = "learning"
-        elif 50 <= evaluated_count:
+        elif 40 <= evaluated_count:
             state = "smart"
         return state
 
@@ -232,7 +236,7 @@ class FilterPicker(astropaint.base.BasePicker):
         Y = [p.evaluation for p in processed]
         X = [self._unwrap([s["params"] for s in p.filter.steps]) for p in processed]
         model = sklearn.pipeline.Pipeline([('poly', sklearn.preprocessing.PolynomialFeatures(degree=2)),
-                                           ('linear', sklearn.linear_model.ElasticNet())])
+                                           ('linear', sklearn.linear_model.LinearRegression())])
         model = model.fit(X, Y)
         params = self._optimize(model, bounds, self._unwrap([s["params"] for s in best_filter.steps]))
         optimal_steps = self._wrap_values(best_filter.steps, params)
