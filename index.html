@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<body>
 <style>
 .dot {
   fill: mediumaquamarine;
@@ -19,6 +18,12 @@
   shape-rendering: crispEdges;
 }
 </style>
+<body>
+  <div id="images">
+  </div>
+  <div id="plots">
+  </div>
+</body>
 <script src="https://d3js.org/d3.v3.min.js"></script>
 <script>
 var margin = {top: 20, right: 30, bottom: 50, left: 40},
@@ -33,10 +38,32 @@ function getRows(url) {
   return JSON.parse(req.responseText).rows.map(function(x) { return x.value; });
 }
 
+function showImages(evaluated) {
+  data = evaluated.sort(function(a, b) { return a.evaluation - b.evaluation; } );
+  for (var i in data) {
+    d = data[i];
+    var img = document.createElement("img");
+    img.setAttribute('src', './temp/' + d._id + '.png');
+    img.setAttribute('alt', d.evaluation);
+    img.setAttribute('id', d._id);
+    document.getElementById('images').appendChild(img);
+  }
+}
+
+function evalVsParam(processed, methodName, index=0) {
+  var data = processed.map(function(d) {
+    var method = d.filter.steps.find(function(d) {
+      return d.method == methodName;
+    });
+    return {"x": method ? method.params[index] : null, "y": d.evaluation};
+  })
+  return data;
+}
+
 function plot(data) {
   data = data.filter(function(d) { return d.x != null; });
 
-  var svg = d3.select("body").append("svg")
+  var svg = d3.select("#plots").append("svg")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height + margin.top + margin.bottom)
     .append("g")
@@ -89,36 +116,12 @@ function plot(data) {
 
 processed = getRows("http://localhost:5984/processing/_design/astro/_view/all");
 
-processedScoreVsGamma = processed.map(function(d) {
-  var adjust_gamma = d.filter.steps.find(function(d) {
-    return d.method == "adjust_gamma";
-  });
-  return {"y": d.evaluation, "x": adjust_gamma ? adjust_gamma.params[0] : null };
-});
+plot(evalVsParam(processed, "adjust_gamma"));
+plot(evalVsParam(processed, "stretch", 0));
+plot(evalVsParam(processed, "stretch", 1));
+plot(evalVsParam(processed, "adjust_sigmoid"));
+plot(evalVsParam(processed, "sharpen_laplace"));
+plot(evalVsParam(processed, "sharpen_gaussian"));
 
-processedScoreVsStretchLow = processed.map(function(d) {
-  var stretch = d.filter.steps.find(function(d) {
-    return d.method == "stretch";
-  });
-  return {"y": d.evaluation, "x": stretch ? stretch.params[0] : null };
-});
-
-processedScoreVsStretchHigh = processed.map(function(d) {
-  var stretch = d.filter.steps.find(function(d) {
-    return d.method == "stretch";
-  });
-  return {"y": d.evaluation, "x": stretch ? stretch.params[1] : null };
-});
-
-processedScoreVsSigmoid = processed.map(function(d) {
-  var stretch = d.filter.steps.find(function(d) {
-    return d.method == "adjust_sigmoid";
-  });
-  return {"y": d.evaluation, "x": stretch ? stretch.params[0] : null };
-});
-
-plot(processedScoreVsGamma);
-plot(processedScoreVsStretchLow);
-plot(processedScoreVsStretchHigh);
-plot(processedScoreVsSigmoid);
+showImages(processed.filter(function(d) { return d.evaluation != null; }));
 </script>
