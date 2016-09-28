@@ -1,12 +1,15 @@
-numpy==1.11
-astropy==1.2
-scipy==0.17
-scikit-image==0.12
-couchdb==1.0
-requests==2.11
+# use install.py to install dependencies
+numpy
+astropy
+scipy
+scikit-learn
+scikit-image
+matplotlib
+couchdb
+requests
 
 #test
-tox==2.3
+tox
 
 #dev
 ipython
