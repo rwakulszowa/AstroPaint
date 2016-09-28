@@ -7,17 +7,10 @@ import os
 import config
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument(dest="command", help="One of: cleardb, evaluate")
-
-
-DBS = ["analysis", "classification", "processing"]
-SERVER = couchdb.client.Server(config.DB_ADDRESS)
-
 def clear_db():
-    print("Clearing databases {} in {}".format(DBS, config.DB_ADDRESS))
-    for db in DBS:
-        db = SERVER[db]
+    print("Clearing databases {} in {}".format(dbs, config.DB_ADDRESS))
+    for db in dbs:
+        db = server[db]
         docs = [db[id] for id in db if not id.startswith('_')]
         db.purge(docs)
 
@@ -27,7 +20,7 @@ def clear_images():
         os.remove(os.path.join(config.STORAGE_DIR, i))
 
 def evaluate():
-    db = SERVER["processing"]
+    db = server["processing"]
     ids = [i.split('.')[0] for i in _get_images()]
     for id in ids:
         processed = db[id]
@@ -44,10 +37,16 @@ def _get_images():
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
     commands = {
         "clear_db": clear_db,
         "clear_images": clear_images,
         "evaluate": evaluate,
     }
+    dbs = ["analysis", "classification", "processing"]
+    server = couchdb.client.Server(config.DB_ADDRESS)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(dest="command", help="One of: {}".format(list(commands.keys())))
+
+    args = parser.parse_args()
     commands[args.command]()
