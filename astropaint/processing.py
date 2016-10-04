@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 class Processed(astropaint.base.BaseObject):
-    def __init__(self, cluster, filter, evaluation, id=None):
+    def __init__(self, classed, cluster, filter, evaluation, id=None):
+        self.classed = classed
         self.cluster = cluster
         self.filter = filter
         self.evaluation = evaluation
@@ -116,7 +117,7 @@ class Processor(object):
         logger.debug("State: {}".format(state))
         evaluation = None
         data = self._process(filter)
-        processed = Processed(self.classed.get_cluster_data(), filter, evaluation)
+        processed = Processed(self.classed, self.classed.get_cluster_data(), filter, evaluation)
         self._save_image(data, processed.id)
         processed.save(self.db)
         logger.debug(processed)
@@ -128,7 +129,7 @@ class Processor(object):
         skimage.io.imsave(path, data)
 
     def _process(self, filter):
-        data = self.raw.data
+        data = self.raw.data()
         steps = filter.steps
         for s in steps:
             data = self._apply(data, s)

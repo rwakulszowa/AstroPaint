@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class Analyzed(astropaint.base.BaseObject):
-    def __init__(self, model, params, id=None):
+    def __init__(self, model, params, raw, id=None):
         self.model = model
         self.params = params
+        self.raw = raw
         self.id = id or uuid.uuid4().hex
 
     @classmethod
@@ -52,7 +53,7 @@ class Analyzer(object):
     def execute(self):
         model, state = ModelPicker(self.db, self.raw).pick()
         params = self._analyze(model)
-        analyzed = Analyzed(model, params)
+        analyzed = Analyzed(model, params, self.raw)
         analyzed.save(self.db)
         logger.debug(analyzed)
         return analyzed
@@ -70,25 +71,25 @@ class Analyzer(object):
         }[param]()
 
     def _compute_mean(self):
-        return self.raw.data.mean()
+        return self.raw.data().mean()
 
     def _compute_object_count(self):
-        data = self.raw.data[:, :, 0]
+        data = self.raw.data()[:, :, 0]
         data = skimage.exposure.equalize_adapthist(data)
         lm = skimage.feature.peak_local_max(data, threshold_abs=np.percentile(data, 95), min_distance=10)
         return len(lm)
 
     def _compute_percentile_5(self):
-        return np.percentile(self.raw.data, 5)
+        return np.percentile(self.raw.data(), 5)
 
     def _compute_percentile_95(self):
-        return np.percentile(self.raw.data, 95)
+        return np.percentile(self.raw.data(), 95)
 
     def _compute_shape(self):
-        x, y = np.mgrid[:self.raw.data.shape[0], :self.raw.data.shape[1]]
+        x, y = np.mgrid[:self.raw.data().shape[0], :self.raw.data().shape[1]]
         initial = astropy.modeling.models.Gaussian2D(x_stddev=1, y_stddev=1)
         fitter = astropy.modeling.fitting.LevMarLSQFitter()
-        fit = fitter(initial, x, y, self.raw.data[:, :, 0])
+        fit = fitter(initial, x, y, self.raw.data()[:, :, 0])
         return fit.x_stddev / fit.y_stddev
 
 

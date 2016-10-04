@@ -7,16 +7,31 @@ import skimage.transform
 
 from astropy.io import fits
 
+import astropaint.base
+import astropaint.utils
 
-class Raw(object):
+
+class Raw(astropaint.base.BaseObject):
     KINDS = ["ANY", "GALAXY", "CLUSTER", "NEBULA"]
 
-    def __init__(self, urls, kind, size=None):
-        self.urls = urls
-        self.encoded_urls = [urllib.parse.quote_plus(u) for u in self.urls]
+    def __init__(self, encoded_urls, kind):
+        self.encoded_urls = encoded_urls
         self.kind = kind
-        self.data = np.dstack([self._preprocess(self._read(u, "./temp/{}".format(p)), size=size)
-                               for u, p in zip(self.urls, self.encoded_urls)])
+
+    @astropaint.utils.lazy
+    def urls(self):
+        return [urllib.parse.unquote_plus(e) for e in self.encoded_urls]
+
+    @astropaint.utils.lazy
+    def data(self):
+        return np.dstack([self._preprocess(self._read(u, "./temp/{}".format(p)), size=(640, 640))  #NOTE: temporarily hardcoded
+                          for u, p in zip(self.urls(), self.encoded_urls)])
+
+    def dictify(self):
+        return {
+            "kind": self.kind,
+            "encoded_urls": self.encoded_urls
+        }
 
     @classmethod
     def _read(cls, url, path):

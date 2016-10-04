@@ -1,4 +1,5 @@
 import logging
+import urllib.parse
 
 import astropaint.analysis
 import astropaint.classification
@@ -14,10 +15,9 @@ class App(object):
         logging.info("Running app for {}".format(urls))
         db = astropaint.db.Db(config.DB_ADDRESS)
 
-        raw = astropaint.raw.Raw(urls, kind=kind, size=(480, 480))
+        raw = astropaint.raw.Raw([urllib.parse.quote_plus(u) for u in urls], kind=kind)
         analyzed = astropaint.analysis.Analyzer(db, raw).execute()
         classed = astropaint.classification.Classifier(db, analyzed, raw).execute()
         for _ in range(iterations):
             processed = astropaint.processing.Processor(db, classed, raw).execute()
-
         logging.info("Done")

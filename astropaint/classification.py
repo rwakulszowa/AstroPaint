@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class Classed(astropaint.base.BaseObject):
-    def __init__(self, features, layout, cluster, id=None):
+    def __init__(self, analyzed, features, layout, cluster, id=None):
+        self.analyzed = analyzed
         self.features = features
         self.layout = layout
         self.cluster = cluster
@@ -46,7 +47,7 @@ class Classifier(object):
     def execute(self):
         layout, state = LayoutPicker(self.db, self.analyzed).pick()
         cluster = self._classify(self.analyzed, layout)
-        classed = Classed(self.analyzed.model.params, layout, cluster)
+        classed = Classed(self.analyzed, self.analyzed.model.params, layout, cluster)
         classed.save(self.db)
         logger.debug(classed)
         return classed
