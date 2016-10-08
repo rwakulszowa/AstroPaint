@@ -13,10 +13,7 @@ class BaseObject(object):
 
     @classmethod
     def undictify(cls, data: dict) -> "BaseObject":
-        raise NotImplementedError
-
-    def save(self, db):
-        raise NotImplementedError
+        return cls(**data)
 
 
 class BasePicker(object):

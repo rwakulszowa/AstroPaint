@@ -20,4 +20,5 @@ class App(object):
         classed = astropaint.classification.Classifier(db, analyzed, raw).execute()
         for _ in range(iterations):
             processed = astropaint.processing.Processor(db, classed, raw).execute()
+            db.put(processed)
         logging.info("Done")

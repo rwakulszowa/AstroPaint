@@ -15,6 +15,7 @@ import sklearn.pipeline
 import sklearn.preprocessing
 
 import astropaint.base
+import astropaint.classification
 import astropaint.utils
 
 import config
@@ -33,10 +34,8 @@ class Processed(astropaint.base.BaseObject):
     @classmethod
     def undictify(cls, data):
         data["filter"] = Filter.undictify(data["filter"])
+        data["classed"] = astropaint.classification.Classed.undictify(data["classed"])
         return Processed(**data)
-
-    def save(self, db):
-        return db.put_processed(self)
 
 
 class Filter(astropaint.base.BaseObject):
@@ -119,7 +118,6 @@ class Processor(object):
         data = self._process(filter)
         processed = Processed(self.classed, self.classed.get_cluster_data(), filter, evaluation)
         self._save_image(data, processed.id)
-        processed.save(self.db)
         logger.debug(processed)
         return processed
 
@@ -198,6 +196,7 @@ class FilterPicker(astropaint.base.BasePicker):
         self.db = db
         self.classed = classed
         self.evaluated = self.db.get_processed_evaluated()
+        import ipdb; ipdb.set_trace()
         self.evaluated_within_cluster = [e for e in self.evaluated if e.cluster == self.classed.get_cluster_data()]
 
     def _get_state(self):

@@ -1,29 +1,26 @@
 from collections import OrderedDict
-import uuid
 import logging
 
 import sklearn.cluster
 
+import astropaint.analysis
 import astropaint.base
 
 logger = logging.getLogger(__name__)
 
 
 class Classed(astropaint.base.BaseObject):
-    def __init__(self, analyzed, features, layout, cluster, id=None):
+    def __init__(self, analyzed, features, layout, cluster):
         self.analyzed = analyzed
         self.features = features
         self.layout = layout
         self.cluster = cluster
-        self.id = id or uuid.uuid4().hex
 
     @classmethod
     def undictify(cls, data):
         data["layout"] = Layout.undictify(data["layout"])
+        data["analyzed"] = astropaint.analysis.Analyzed.undictify(data["analyzed"])
         return Classed(**data)
-
-    def save(self, db):
-        db.put_classed(self)
 
     def get_cluster_data(self):
         return OrderedDict([(k, v) for k, v in zip(self.features, self.layout.clusters[self.cluster])])
@@ -48,7 +45,6 @@ class Classifier(object):
         layout, state = LayoutPicker(self.db, self.analyzed).pick()
         cluster = self._classify(self.analyzed, layout)
         classed = Classed(self.analyzed, self.analyzed.model.params, layout, cluster)
-        classed.save(self.db)
         logger.debug(classed)
         return classed
 

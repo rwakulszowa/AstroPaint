@@ -1,4 +1,3 @@
-import uuid
 import random
 import logging
 
@@ -8,24 +7,22 @@ import skimage.exposure
 import skimage.feature
 
 import astropaint.base
+import astropaint.raw
 
 logger = logging.getLogger(__name__)
 
 
 class Analyzed(astropaint.base.BaseObject):
-    def __init__(self, model, params, raw, id=None):
+    def __init__(self, model, params, raw):
         self.model = model
         self.params = params
         self.raw = raw
-        self.id = id or uuid.uuid4().hex
 
     @classmethod
     def undictify(cls, data):
         data["model"] = Model.undictify(data["model"])
+        data["raw"] = astropaint.raw.Raw.undictify(data["raw"])
         return Analyzed(**data)
-
-    def save(self, db):
-        return db.put_analyzed(self)
 
 
 class Model(astropaint.base.BaseObject):
@@ -54,7 +51,6 @@ class Analyzer(object):
         model, state = ModelPicker(self.db, self.raw).pick()
         params = self._analyze(model)
         analyzed = Analyzed(model, params, self.raw)
-        analyzed.save(self.db)
         logger.debug(analyzed)
         return analyzed
 
