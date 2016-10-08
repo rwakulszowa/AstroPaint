@@ -11,11 +11,11 @@ import config
 
 
 class App(object):
-    def run(self, urls, kind, iterations):
+    def run(self, urls, kind, iterations, source):
         logging.info("Running app for {}".format(urls))
         db = astropaint.db.Db(config.DB_ADDRESS)
 
-        raw = astropaint.raw.Raw([urllib.parse.quote_plus(u) for u in urls], kind=kind)
+        raw = astropaint.raw.RawBuilder(kind, urls, source).execute()
         analyzed = astropaint.analysis.Analyzer(db, raw).execute()
         classed = astropaint.classification.Classifier(db, analyzed, raw).execute()
         for _ in range(iterations):
