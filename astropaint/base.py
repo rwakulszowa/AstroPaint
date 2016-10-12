@@ -16,7 +16,7 @@ class BaseObject(object):
         return cls(**data)
 
 
-class BasePicker(object):
+class BasePicker(object):  #TODO get rid of this class
     def pick(self):
         state = self._get_state()
         pick_method = {
@@ -41,3 +41,25 @@ class BasePicker(object):
 
     def _pick_best(self):
         raise NotImplementedError
+
+
+class BaseModule(object):
+    """ Base class for each processing step module
+
+    Each subclass is supposed to provide some complete functionality,
+    specified by a obj function.
+    The way the obj function gets solved should be hidden inside the module.
+    """
+
+    def __init__(self, obj, db=None, max_iter=10):
+        self.obj = obj
+        self.db = db
+        self.max_iter = max_iter
+
+    def execute(self, **kwargs):
+        results = [self.build(kwargs) for _ in range(self.max_iter)]
+        scores = [self.obj(r) for r in results]
+        if all([s < 0 for s in scores]):
+            raise Exception("All results suck :/")  #TODO - create an exception class
+        else:
+            return results[ scores.index(max(scores)) ]

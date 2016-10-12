@@ -62,16 +62,14 @@ class Raw(astropaint.base.BaseObject):
         return image
 
 
-class RawBuilder(object):
-    def __init__(self, kind, source_ids, source):
-        self.kind = kind
-        self.source_ids = source_ids
-        self.source = source
+class RawBuilder(astropaint.base.BaseModule):
 
-    def execute(self):
+    def build(self, data_in):
         return Raw(
-            self._make_encoded_urls(self.source_ids, self.source),
-            self.kind)
+            self._make_encoded_urls(
+                data_in["source_ids"],
+                data_in["source"]),
+            data_in["kind"])
 
     @classmethod
     def _make_encoded_urls(cls, source_ids, source):
