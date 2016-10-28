@@ -196,7 +196,6 @@ class FilterPicker(astropaint.base.BasePicker):
         self.db = db
         self.classed = classed
         self.evaluated = self.db.get_processed_evaluated()
-        import ipdb; ipdb.set_trace()
         self.evaluated_within_cluster = [e for e in self.evaluated if e.cluster == self.classed.get_cluster_data()]
 
     def _get_state(self):
