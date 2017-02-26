@@ -8,7 +8,9 @@ import astropaint.base
 
 logger = logging.getLogger(__name__)
 
-
+# rewrite classification in terms of a goal function ->
+# pass some sorta similarity measurement (Analyzed.mean, Analyzed.percentile_5)
+# pass a layout in the goal function
 class Classed(astropaint.base.BaseObject):
     def __init__(self, analyzed, features, layout, cluster):
         self.analyzed = analyzed

@@ -9,7 +9,8 @@ class BaseObject(object):
                             for k, v in sorted(d.items())])
 
     def __repr__(self):
-        return str(self.dictify())
+        return "{} {}".format(self.__class__,
+                              dict(self.dictify()))
 
     @classmethod
     def undictify(cls, data: dict) -> "BaseObject":
